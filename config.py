@@ -25,6 +25,7 @@ PARAMETERS = {
     "moldedWebRib": 11.0,
     "sideBandRib": 14.0,
     "iceRailWidth": 5.0,
+    "softEdgeFillet": 1.2,
 
     "fillet": 5.0,
     "textHeight": 6.0,
