@@ -178,7 +178,12 @@ class Layout:
             for start, end in zip(column, column[1:]):
                 for side in (-1, 1):
                     x = start[0] + side * tangent_offset
-                    ribs.append((x, start[1], x, end[1], self.structuralRib))
+                    waist_x = x - side * (self.structuralRib * 0.48)
+                    middle_y = (start[1] + end[1]) / 2.0
+                    fade = self.holderOuterRadius * 0.42
+
+                    ribs.append((x, start[1] + fade, waist_x, middle_y, self.structuralRib))
+                    ribs.append((waist_x, middle_y, x, end[1] - fade, self.structuralRib))
 
         return ribs
 
@@ -193,9 +198,12 @@ class Layout:
             channel_x = rail_left if side < 0 else rail_right
             inner_x = cx - side * inner_overlap
             y_delta = self.rowSpacing * 0.32
+            outer_y_delta = self.rowSpacing * 0.18
 
             ribs.append((inner_x, cy + y_delta, channel_x, cy, self.moldedWebRib))
             ribs.append((inner_x, cy - y_delta, channel_x, cy, self.moldedWebRib))
+            ribs.append((cx, cy + outer_y_delta, channel_x, cy + y_delta, self.moldedWebRib * 0.66))
+            ribs.append((cx, cy - outer_y_delta, channel_x, cy - y_delta, self.moldedWebRib * 0.66))
 
         for y in (
             (self.rows[0] + self.rows[1]) / 2.0,
@@ -226,6 +234,8 @@ class Layout:
                 (0.0, 1.0),
                 (-side * 0.65, -0.76),
                 (-side * 0.65, 0.76),
+                (side * 0.55, -0.83),
+                (side * 0.55, 0.83),
             ]
 
             for dx, dy in directions:
