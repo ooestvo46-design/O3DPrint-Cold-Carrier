@@ -138,26 +138,24 @@ class Layout:
                     x = start[0] + side * tangent_offset
                     ribs.append((x, start[1], x, end[1], self.structuralRib))
 
-        lower_y = self.rows[0]
-        upper_y = self.rows[2]
-        ribs.append((self.leftX + tangent_offset, lower_y, self.rightX - tangent_offset, lower_y, self.structuralRib))
-        ribs.append((self.leftX + tangent_offset, upper_y, self.rightX - tangent_offset, upper_y, self.structuralRib))
-
         return ribs
 
     def perimeterRibs(self):
-        x, y, width, height = self.base()
-        left_x = x + self.outerFrameRib / 2.0
-        right_x = x + width - self.outerFrameRib / 2.0
-        bottom_y = y + self.outerFrameRib / 2.0
-        top_y = y + height - self.outerFrameRib / 2.0
+        ribs = []
+        edge_overlap = 2.0
+        perimeter_offset = self.holderOuterRadius + self.outerFrameRib / 2.0 - edge_overlap
+        bottom_y = self.rows[0] - perimeter_offset
+        top_y = self.rows[2] + perimeter_offset
 
-        return [
-            (left_x, bottom_y, left_x, top_y, self.outerFrameRib),
-            (right_x, bottom_y, right_x, top_y, self.outerFrameRib),
-            (left_x, bottom_y, right_x, bottom_y, self.outerFrameRib),
-            (left_x, top_y, right_x, top_y, self.outerFrameRib),
-        ]
+        for column_x, side in ((self.leftX, -1), (self.rightX, 1)):
+            outer_x = column_x + side * perimeter_offset
+            inner_x = column_x - side * perimeter_offset
+
+            ribs.append((outer_x, self.rows[0], outer_x, self.rows[2], self.outerFrameRib))
+            ribs.append((outer_x, top_y, inner_x, top_y, self.outerFrameRib))
+            ribs.append((outer_x, bottom_y, inner_x, bottom_y, self.outerFrameRib))
+
+        return ribs
 
     def icePackBridgeRibs(self):
         ribs = []
