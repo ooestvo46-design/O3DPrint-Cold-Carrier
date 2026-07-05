@@ -27,6 +27,8 @@ class Layout:
         self.structuralRib = PARAMETERS["structuralRib"]
         self.outerFrameRib = PARAMETERS["outerFrameRib"]
         self.holderBlendRib = PARAMETERS["holderBlendRib"]
+        self.moldedWebRib = PARAMETERS["moldedWebRib"]
+        self.sideBandRib = PARAMETERS["sideBandRib"]
         self.iceRailWidth = PARAMETERS["iceRailWidth"]
 
         self.holderInnerRadius = self.canRadius + 1.0
@@ -101,6 +103,21 @@ class Layout:
              self.iceRailWidth),
         ]
 
+    def iceChannelBlendRibs(self):
+        rail_length = self.iceHeight - 8.0
+        lower_y = -rail_length / 2.0
+        upper_y = rail_length / 2.0
+        flare = self.iceRailWidth * 2.2
+        rail_left = -self.iceThickness / 2.0 - self.iceRailWidth / 2.0
+        rail_right = self.iceThickness / 2.0 + self.iceRailWidth / 2.0
+
+        return [
+            (rail_left - flare, lower_y - flare, rail_left, lower_y, self.iceRailWidth),
+            (rail_right + flare, lower_y - flare, rail_right, lower_y, self.iceRailWidth),
+            (rail_left - flare, upper_y + flare, rail_left, upper_y, self.iceRailWidth),
+            (rail_right + flare, upper_y + flare, rail_right, upper_y, self.iceRailWidth),
+        ]
+
     def centerStop(self):
         return (
             -self.iceThickness / 2.0 - self.iceRailWidth,
@@ -165,10 +182,39 @@ class Layout:
 
         return ribs
 
+    def moldedWebRibs(self):
+        ribs = []
+        rail_left = -self.iceThickness / 2.0 - self.iceRailWidth / 2.0
+        rail_right = self.iceThickness / 2.0 + self.iceRailWidth / 2.0
+        inner_overlap = self.holderOuterRadius - 3.0
+
+        for cx, cy in self.canCenters():
+            side = -1 if cx < 0 else 1
+            channel_x = rail_left if side < 0 else rail_right
+            inner_x = cx - side * inner_overlap
+            y_delta = self.rowSpacing * 0.32
+
+            ribs.append((inner_x, cy + y_delta, channel_x, cy, self.moldedWebRib))
+            ribs.append((inner_x, cy - y_delta, channel_x, cy, self.moldedWebRib))
+
+        for y in (
+            (self.rows[0] + self.rows[1]) / 2.0,
+            (self.rows[1] + self.rows[2]) / 2.0,
+        ):
+            ribs.append((
+                self.leftX + self.holderInnerRadius,
+                y,
+                self.rightX - self.holderInnerRadius,
+                y,
+                self.moldedWebRib * 0.72,
+            ))
+
+        return ribs
+
     def holderBlendRibs(self):
         ribs = []
         overlap = 3.0
-        blend_length = self.holderOuterRadius * 0.45
+        blend_length = self.holderOuterRadius * 0.32
         radial_start = self.holderOuterRadius - overlap
         radial_end = self.holderOuterRadius + blend_length
 
@@ -198,18 +244,27 @@ class Layout:
 
     def perimeterRibs(self):
         ribs = []
-        edge_overlap = 2.0
-        perimeter_offset = self.holderOuterRadius + self.outerFrameRib / 2.0 - edge_overlap
-        bottom_y = self.rows[0] - perimeter_offset
-        top_y = self.rows[2] + perimeter_offset
+        side_offset = self.holderOuterRadius + self.sideBandRib / 2.0 - 2.0
+        end_offset = self.holderOuterRadius + self.sideBandRib / 2.0 - 4.0
 
         for column_x, side in ((self.leftX, -1), (self.rightX, 1)):
-            outer_x = column_x + side * perimeter_offset
-            inner_x = column_x - side * perimeter_offset
+            outer_x = column_x + side * side_offset
+            waist_x = outer_x - side * (self.sideBandRib * 0.55)
+            shoulder_x = column_x - side * (self.holderOuterRadius * 0.25)
+            bottom_y = self.rows[0] - end_offset
+            top_y = self.rows[2] + end_offset
 
-            ribs.append((outer_x, self.rows[0], outer_x, self.rows[2], self.outerFrameRib))
-            ribs.append((outer_x, top_y, inner_x, top_y, self.outerFrameRib))
-            ribs.append((outer_x, bottom_y, inner_x, bottom_y, self.outerFrameRib))
+            for lower, upper in zip(self.rows, self.rows[1:]):
+                middle = (lower + upper) / 2.0
+                fade = self.holderOuterRadius * 0.38
+                ribs.append((outer_x, lower + fade, waist_x, middle, self.sideBandRib))
+                ribs.append((waist_x, middle, outer_x, upper - fade, self.sideBandRib))
+
+            ribs.append((outer_x, top_y, shoulder_x, self.rows[2] + self.holderOuterRadius * 0.55, self.sideBandRib))
+            ribs.append((outer_x, bottom_y, shoulder_x, self.rows[0] - self.holderOuterRadius * 0.55, self.sideBandRib))
+
+            ribs.append((outer_x, self.rows[0], column_x, self.rows[0] - self.holderOuterRadius * 0.8, self.sideBandRib))
+            ribs.append((outer_x, self.rows[2], column_x, self.rows[2] + self.holderOuterRadius * 0.8, self.sideBandRib))
 
         return ribs
 
