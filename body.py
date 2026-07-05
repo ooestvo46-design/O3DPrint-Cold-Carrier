@@ -191,6 +191,7 @@ def create_capsule_join_feature(root, name, ribs, height):
 def create_ice_pack_guides(root, layout):
     ribs = list(layout.iceGuideRibs())
     ribs.append(layout.centerStopRib())
+    ribs.extend(layout.iceChannelBlendRibs())
 
     return create_capsule_join_feature(
         root,
@@ -212,6 +213,7 @@ def create_cooling_ribs(root, layout):
 def create_structural_frame_ribs(root, layout):
     ribs = []
     ribs.extend(layout.structuralRibs())
+    ribs.extend(layout.moldedWebRibs())
     ribs.extend(layout.holderBlendRibs())
     ribs.extend(layout.perimeterRibs())
     ribs.extend(layout.icePackBridgeRibs())
