@@ -217,6 +217,19 @@ def create_cooling_ribs(root, layout):
     )
 
 
+def create_side_wall_panels(root, layout):
+    ribs = []
+    ribs.extend(layout.sidePanelRibs())
+    ribs.extend(layout.handleReceiverRibs())
+
+    return create_capsule_join_feature(
+        root,
+        "Side Wall Panel",
+        ribs,
+        PARAMETERS["bottomThickness"] + PARAMETERS["sidePanelHeight"]
+    )
+
+
 def create_structural_frame_ribs(root, layout):
     ribs = []
     ribs.extend(layout.structuralRibs())
@@ -285,6 +298,7 @@ def create_bottom_frame(design):
 
     create_structural_frame_ribs(root, layout)
     create_ice_pack_guides(root, layout)
+    create_side_wall_panels(root, layout)
     create_cooling_ribs(root, layout)
     create_raised_can_pads(root, layout)
     soften_generated_edges(root)
