@@ -10,6 +10,7 @@ SKETCH_NAME = "O3DPrint Carrier V2 Layout"
 BASE_SKETCH_NAME = "O3DPrint Carrier V2 Base"
 HOLDER_SKETCH_PREFIX = "O3DPrint Carrier V2 Holder "
 EXTRA_SKETCH_PREFIX = "O3DPrint Carrier V2 Extra "
+TEXT_SKETCH_PREFIX = "O3DPrint Carrier V2 Text "
 BODY_NAME = "O3DPrint Carrier V2 Bottom Frame"
 GENERATED_BODY_PREFIX = "O3DPrint Carrier V2"
 
@@ -34,7 +35,7 @@ def remove_existing_layout_sketch(root):
 
 def remove_existing_bottom_frame(root):
     sketch_names = [BASE_SKETCH_NAME]
-    sketch_prefixes = [EXTRA_SKETCH_PREFIX]
+    sketch_prefixes = [EXTRA_SKETCH_PREFIX, TEXT_SKETCH_PREFIX]
     sketch_names.extend(
         HOLDER_SKETCH_PREFIX + str(index + 1)
         for index in range(PARAMETERS["canCount"])
@@ -111,6 +112,37 @@ def draw_rectangle(sketch, x, y, width, height):
     center = mm_point(x + width / 2.0, y + height / 2.0)
     corner = mm_point(x + width, y + height)
     sketch.sketchCurves.sketchLines.addCenterPointRectangle(center, corner)
+
+
+def quote_text_expression(text):
+    return "'" + text.replace("'", "\\'") + "'"
+
+
+def add_multiline_sketch_text(sketch, text, x, y, width, height):
+    sketch_texts = sketch.sketchTexts
+    text_height = mm_value(PARAMETERS["textHeight"])
+    corner = mm_point(x, y)
+    diagonal = mm_point(x + width, y + height)
+
+    create_input3 = getattr(sketch_texts, "createInput3", None)
+
+    if create_input3:
+        text_input = create_input3(quote_text_expression(text), text_height)
+        text_input.setAsMultiLine(
+            corner,
+            diagonal,
+            adsk.core.HorizontalAlignments.CenterHorizontalAlignment,
+            adsk.core.VerticalAlignments.MiddleVerticalAlignment,
+            0.0
+        )
+        return sketch_texts.add(text_input)
+
+    text_input = sketch_texts.createInput(
+        text,
+        PARAMETERS["textHeight"] * MM_TO_CM,
+        corner
+    )
+    return sketch_texts.add(text_input)
 
 
 def create_base(root, layout):
@@ -274,6 +306,20 @@ def create_drain_holes(root, layout):
         )
 
 
+def create_side_text_sketches(root, layout):
+    for block in layout.sideTextBlocks():
+        sketch = root.sketches.add(root.xYConstructionPlane)
+        sketch.name = TEXT_SKETCH_PREFIX + block["name"]
+        add_multiline_sketch_text(
+            sketch,
+            block["text"],
+            block["x"],
+            block["y"],
+            block["width"],
+            block["height"]
+        )
+
+
 def create_bottom_frame(design):
     root = design.rootComponent
     remove_existing_bottom_frame(root)
@@ -291,3 +337,4 @@ def create_bottom_frame(design):
     create_base_relief_openings(root, layout)
     create_raised_can_pads(root, layout)
     create_drain_holes(root, layout)
+    create_side_text_sketches(root, layout)
