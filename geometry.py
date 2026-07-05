@@ -31,6 +31,10 @@ class Layout:
         self.sideBandRib = PARAMETERS["sideBandRib"]
         self.iceRailWidth = PARAMETERS["iceRailWidth"]
         self.handleReceiverRib = PARAMETERS["handleReceiverRib"]
+        self.sidePanelHeight = PARAMETERS["sidePanelHeight"]
+        self.sidePanelThickness = PARAMETERS["sidePanelThickness"]
+        self.holderButtressRib = PARAMETERS["holderButtressRib"]
+        self.iceShoulderRib = PARAMETERS["iceShoulderRib"]
 
         self.holderInnerRadius = self.canRadius + 1.0
         self.holderOuterRadius = self.holderInnerRadius + self.wall
@@ -255,13 +259,13 @@ class Layout:
 
     def perimeterRibs(self):
         ribs = []
-        side_offset = self.holderOuterRadius + self.sideBandRib / 2.0 - 2.0
-        end_offset = self.holderOuterRadius + self.sideBandRib / 2.0 - 4.0
+        side_offset = self.holderOuterRadius + self.sideBandRib / 2.0 - 6.0
+        end_offset = self.holderOuterRadius + self.sideBandRib / 2.0 - 10.0
 
         for column_x, side in ((self.leftX, -1), (self.rightX, 1)):
             outer_x = column_x + side * side_offset
-            waist_x = outer_x - side * (self.sideBandRib * 0.55)
-            shoulder_x = column_x - side * (self.holderOuterRadius * 0.25)
+            waist_x = outer_x - side * (self.sideBandRib * 1.25)
+            shoulder_x = column_x - side * (self.holderOuterRadius * 0.45)
             bottom_y = self.rows[0] - end_offset
             top_y = self.rows[2] + end_offset
 
@@ -279,10 +283,52 @@ class Layout:
 
         return ribs
 
+    def verticalSidePanels(self):
+        panels = []
+        panel_span = self.holderOuterRadius * 0.84
+        y_min = self.rows[0] - panel_span
+        y_max = self.rows[2] + panel_span
+        z_min = self.bottomThickness
+        z_max = self.bottomThickness + self.sidePanelHeight
+
+        for column_x, side in ((self.leftX, -1), (self.rightX, 1)):
+            x = column_x + side * (self.holderOuterRadius + self.sidePanelThickness * 0.45)
+            windows = []
+
+            for lower, upper in zip(self.rows, self.rows[1:]):
+                center_y = (lower + upper) / 2.0
+                half_width = self.rowSpacing * 0.26
+                lower_half_width = half_width * 1.16
+                upper_half_width = half_width * 0.82
+                windows.append([
+                    (center_y - lower_half_width, z_min + 5.0),
+                    (center_y + lower_half_width, z_min + 5.0),
+                    (center_y + upper_half_width, z_max - 5.5),
+                    (center_y - upper_half_width, z_max - 5.5),
+                ])
+
+            return_points = {
+                "side": side,
+                "x": x,
+                "thickness": self.sidePanelThickness,
+                "outer": [
+                    (y_min + 10.0, z_min),
+                    (y_max - 10.0, z_min),
+                    (y_max, z_min + 7.0),
+                    (y_max - 5.0, z_max),
+                    (y_min + 5.0, z_max),
+                    (y_min, z_min + 7.0),
+                ],
+                "windows": windows,
+            }
+            panels.append(return_points)
+
+        return panels
+
     def sidePanelRibs(self):
         ribs = []
-        side_offset = self.holderOuterRadius + self.sideBandRib / 2.0 - 2.0
-        panel_inner = self.holderOuterRadius * 0.55
+        side_offset = self.holderOuterRadius + self.sidePanelThickness
+        panel_inner = self.holderOuterRadius * 0.48
 
         for column_x, side in ((self.leftX, -1), (self.rightX, 1)):
             outer_x = column_x + side * side_offset
@@ -290,10 +336,35 @@ class Layout:
 
             for lower, upper in zip(self.rows, self.rows[1:]):
                 mid_y = (lower + upper) / 2.0
-                aperture = self.rowSpacing * 0.36
-                ribs.append((outer_x, lower + aperture, inner_x, mid_y, self.sideBandRib * 0.72))
-                ribs.append((inner_x, mid_y, outer_x, upper - aperture, self.sideBandRib * 0.72))
-                ribs.append((outer_x, lower + aperture, outer_x, upper - aperture, self.sideBandRib * 0.58))
+                aperture = self.rowSpacing * 0.31
+                ribs.append((outer_x, lower + aperture, inner_x, mid_y, self.sideBandRib * 0.82))
+                ribs.append((inner_x, mid_y, outer_x, upper - aperture, self.sideBandRib * 0.82))
+
+        return ribs
+
+    def holderButtressRibs(self):
+        ribs = []
+        side_offset = self.holderOuterRadius + self.sidePanelThickness
+
+        for cx, cy in self.canCenters():
+            side = -1 if cx < 0 else 1
+            outer_x = cx + side * side_offset
+            shoulder_x = cx + side * (self.holderOuterRadius * 0.36)
+            ribs.append((shoulder_x, cy, outer_x, cy, self.holderButtressRib))
+            ribs.append((
+                cx + side * (self.holderOuterRadius * 0.16),
+                cy - self.holderOuterRadius * 0.36,
+                outer_x,
+                cy - self.holderOuterRadius * 0.62,
+                self.holderButtressRib * 0.78,
+            ))
+            ribs.append((
+                cx + side * (self.holderOuterRadius * 0.16),
+                cy + self.holderOuterRadius * 0.36,
+                outer_x,
+                cy + self.holderOuterRadius * 0.62,
+                self.holderButtressRib * 0.78,
+            ))
 
         return ribs
 
@@ -335,6 +406,23 @@ class Layout:
                 y,
                 rib_width,
             ))
+
+        return ribs
+
+    def iceChannelShoulderRibs(self):
+        ribs = []
+        rail_left = -self.iceThickness / 2.0 - self.iceRailWidth / 2.0
+        rail_right = self.iceThickness / 2.0 + self.iceRailWidth / 2.0
+
+        for cy in self.rows:
+            y_delta = self.holderOuterRadius * 0.46
+            ribs.append((rail_left, cy - y_delta, self.leftX + self.holderOuterRadius * 0.32, cy, self.iceShoulderRib))
+            ribs.append((rail_left, cy + y_delta, self.leftX + self.holderOuterRadius * 0.32, cy, self.iceShoulderRib))
+            ribs.append((rail_right, cy - y_delta, self.rightX - self.holderOuterRadius * 0.32, cy, self.iceShoulderRib))
+            ribs.append((rail_right, cy + y_delta, self.rightX - self.holderOuterRadius * 0.32, cy, self.iceShoulderRib))
+
+        for y in (-self.iceHeight * 0.34, self.iceHeight * 0.34):
+            ribs.append((rail_left, y, rail_right, y, self.iceShoulderRib * 0.78))
 
         return ribs
 
