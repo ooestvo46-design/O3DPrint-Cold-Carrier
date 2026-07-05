@@ -189,3 +189,46 @@ class Layout:
                 slots.append((x - slot_width / 2.0, y - slot_height / 2.0, slot_width, slot_height))
 
         return slots
+
+    def sideTextBlocks(self):
+        x, y, width, height = self.base()
+        long_width = min(96.0, width - 2.0 * self.frameOpeningWeb)
+        long_height = 22.0
+        short_width = min(72.0, height - 2.0 * self.frameOpeningWeb)
+        short_height = 16.0
+        offset = 3.0
+
+        return [
+            {
+                "name": "Long Side Front",
+                "text": "O3DPRINT\n❄\nCOLD CARRIER",
+                "x": -long_width / 2.0,
+                "y": y + offset,
+                "width": long_width,
+                "height": long_height,
+            },
+            {
+                "name": "Long Side Back",
+                "text": "O3DPRINT\n❄\nCOLD CARRIER",
+                "x": -long_width / 2.0,
+                "y": y + height - offset - long_height,
+                "width": long_width,
+                "height": long_height,
+            },
+            {
+                "name": "Short Side Left",
+                "text": "DESIGNED BY\nO3DPRINT",
+                "x": x + offset,
+                "y": -short_height / 2.0,
+                "width": short_width,
+                "height": short_height,
+            },
+            {
+                "name": "Short Side Right",
+                "text": "DESIGNED BY\nO3DPRINT",
+                "x": x + width - offset - short_width,
+                "y": -short_height / 2.0,
+                "width": short_width,
+                "height": short_height,
+            },
+        ]
