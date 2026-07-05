@@ -18,6 +18,8 @@ PARAMETERS = {
     "airGap": 4.0,
     "coolingGap": 12.0,
     "frameOpeningWeb": 8.0,
+    "structuralRib": 10.0,
+    "outerFrameRib": 12.0,
 
     "fillet": 5.0,
     "textHeight": 6.0,
