@@ -23,11 +23,12 @@ class Layout:
         self.airGap = PARAMETERS["airGap"]
         self.guideRail = PARAMETERS["guideRail"]
         self.guideRailHeight = PARAMETERS.get("guideRailHeight", 55.0)
+        self.frameOpeningWeb = PARAMETERS["frameOpeningWeb"]
 
         self.holderInnerRadius = self.canRadius + 1.0
         self.holderOuterRadius = self.holderInnerRadius + self.wall
 
-        self.coolingGap = 2.5
+        self.coolingGap = PARAMETERS["coolingGap"]
         self.leftX = -(self.iceThickness / 2.0 + self.coolingGap + self.holderOuterRadius)
         self.rightX = +(self.iceThickness / 2.0 + self.coolingGap + self.holderOuterRadius)
 
@@ -104,6 +105,10 @@ class Layout:
     def coolingRibs(self):
         ribs = []
         rib_width = 3.0
+        rib_positions = [
+            (self.rows[0] + self.rows[1]) / 2.0,
+            (self.rows[1] + self.rows[2]) / 2.0,
+        ]
 
         for x in (self.leftX, self.rightX):
             side = -1 if x < 0 else 1
@@ -112,10 +117,49 @@ class Layout:
             width = abs(outer_x - inner_x)
             start_x = min(inner_x, outer_x)
 
-            for y in self.rows:
+            for y in rib_positions:
                 ribs.append((start_x, y - rib_width / 2.0, width, rib_width))
 
         return ribs
+
+    def coolingWindows(self):
+        windows = []
+        window_height = min(46.0, self.rowSpacing - self.frameOpeningWeb)
+
+        for x in (self.leftX, self.rightX):
+            side = -1 if x < 0 else 1
+
+            if side < 0:
+                x1 = self.leftX + self.holderOuterRadius + 1.0
+                x2 = -self.iceThickness / 2.0 - self.guideRail - 1.0
+            else:
+                x1 = self.iceThickness / 2.0 + self.guideRail + 1.0
+                x2 = self.rightX - self.holderOuterRadius - 1.0
+
+            width = max(4.0, abs(x2 - x1))
+            start_x = min(x1, x2)
+
+            for y in self.rows:
+                windows.append((start_x, y - window_height / 2.0, width, window_height))
+
+        return windows
+
+    def centerAirOpening(self):
+        width = max(6.0, self.iceThickness - 2.0 * self.guideRail)
+        height = self.iceHeight - 2.0 * self.frameOpeningWeb
+        return (-width / 2.0, -height / 2.0, width, height)
+
+    def baseReliefOpenings(self):
+        openings = [self.centerAirOpening()]
+        x, y, width, height = self.base()
+        relief_width = max(8.0, self.iceThickness + 2.0 * self.guideRail)
+        relief_height = 18.0
+        center_x = -relief_width / 2.0
+
+        openings.append((center_x, y + self.frameOpeningWeb, relief_width, relief_height))
+        openings.append((center_x, y + height - self.frameOpeningWeb - relief_height, relief_width, relief_height))
+
+        return openings
 
     def raisedCanPads(self):
         pads = []
