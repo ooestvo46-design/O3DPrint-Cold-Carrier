@@ -29,6 +29,13 @@ def collection_items(collection):
     return [collection.item(index) for index in range(collection.count)]
 
 
+def generated_bodies(root):
+    return [
+        body for body in collection_items(root.bRepBodies)
+        if body.name.startswith(GENERATED_BODY_PREFIX)
+    ]
+
+
 def remove_existing_layout_sketch(root):
     for sketch in collection_items(root.sketches):
         if sketch.name == SKETCH_NAME:
@@ -243,6 +250,30 @@ def create_raised_can_pads(root, layout):
         )
 
 
+def soften_generated_edges(root):
+    radius = PARAMETERS.get("softEdgeFillet", 0.0)
+    if radius <= 0:
+        return
+
+    fillets = root.features.filletFeatures
+
+    for body in generated_bodies(root):
+        edges = adsk.core.ObjectCollection.create()
+
+        for edge in collection_items(body.edges):
+            edges.add(edge)
+
+        if edges.count == 0:
+            continue
+
+        try:
+            fillet_input = fillets.createInput()
+            fillet_input.addConstantRadiusEdgeSet(edges, mm_value(radius), True)
+            fillets.add(fillet_input)
+        except Exception:
+            continue
+
+
 def create_bottom_frame(design):
     root = design.rootComponent
     remove_existing_bottom_frame(root)
@@ -256,3 +287,4 @@ def create_bottom_frame(design):
     create_ice_pack_guides(root, layout)
     create_cooling_ribs(root, layout)
     create_raised_can_pads(root, layout)
+    soften_generated_edges(root)
