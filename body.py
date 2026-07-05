@@ -9,6 +9,7 @@ from geometry import Layout
 SKETCH_NAME = "O3DPrint Carrier V2 Layout"
 HOLDER_SKETCH_PREFIX = "O3DPrint Carrier V2 Holder "
 EXTRA_SKETCH_PREFIX = "O3DPrint Carrier V2 Extra "
+PLANE_PREFIX = "O3DPrint Carrier V2 Plane "
 BODY_PREFIX = "O3DPrint Carrier V2 Body "
 GENERATED_BODY_PREFIX = "O3DPrint Carrier V2"
 
@@ -53,6 +54,10 @@ def remove_existing_bottom_frame(root):
         if any(sketch.name.startswith(prefix) for prefix in sketch_prefixes):
             sketch.deleteMe()
 
+    for plane in collection_items(root.constructionPlanes):
+        if plane.name.startswith(PLANE_PREFIX):
+            plane.deleteMe()
+
 
 def create_layout_sketch(design):
     root = design.rootComponent
@@ -81,27 +86,44 @@ def ring_profile(sketch):
     raise RuntimeError("No ring profile was created.")
 
 
-def extrude_profile(root, profile, height, operation, taper_angle=0.0):
+def multi_loop_profile(sketch):
+    best_profile = None
+    best_loop_count = 0
+
+    for profile in collection_items(sketch.profiles):
+        loop_count = profile.profileLoops.count
+        if loop_count > best_loop_count:
+            best_profile = profile
+            best_loop_count = loop_count
+
+    if best_profile:
+        return best_profile
+
+    raise RuntimeError("No closed profile was created.")
+
+
+def extrude_profile(root, profile, height, operation, taper_angle=0.0, direction=None):
     extrudes = root.features.extrudeFeatures
     extrude_input = extrudes.createInput(profile, operation)
     extent = adsk.fusion.DistanceExtentDefinition.create(mm_value(height))
+    extent_direction = direction or adsk.fusion.ExtentDirections.PositiveExtentDirection
 
     if taper_angle:
         try:
             extrude_input.setOneSideExtent(
                 extent,
-                adsk.fusion.ExtentDirections.PositiveExtentDirection,
+                extent_direction,
                 angle_value(taper_angle)
             )
         except TypeError:
             extrude_input.setOneSideExtent(
                 extent,
-                adsk.fusion.ExtentDirections.PositiveExtentDirection
+                extent_direction
             )
     else:
         extrude_input.setOneSideExtent(
             extent,
-            adsk.fusion.ExtentDirections.PositiveExtentDirection
+            extent_direction
         )
 
     return extrudes.add(extrude_input)
@@ -131,6 +153,24 @@ def draw_capsule(sketch, x1, y1, x2, y2, width):
         draw_rectangle(sketch, x - radius, bottom, width, top - bottom)
         circles.addByCenterRadius(mm_point(x, bottom), radius * MM_TO_CM)
         circles.addByCenterRadius(mm_point(x, top), radius * MM_TO_CM)
+
+
+def draw_vertical_polygon(sketch, x, points):
+    sketch_lines = sketch.sketchCurves.sketchLines
+    sketch_points = [mm_point(x, y, z) for y, z in points]
+
+    for index, start in enumerate(sketch_points):
+        end = sketch_points[(index + 1) % len(sketch_points)]
+        sketch_lines.addByTwoPoints(start, end)
+
+
+def create_offset_yz_plane(root, x, name):
+    planes = root.constructionPlanes
+    plane_input = planes.createInput()
+    plane_input.setByOffset(root.yZConstructionPlane, mm_value(x))
+    plane = planes.add(plane_input)
+    plane.name = PLANE_PREFIX + name
+    return plane
 
 
 def create_can_holder(root, layout, index):
@@ -221,12 +261,49 @@ def create_side_wall_panels(root, layout):
     ribs = []
     ribs.extend(layout.sidePanelRibs())
     ribs.extend(layout.handleReceiverRibs())
+    ribs.extend(layout.holderButtressRibs())
 
-    return create_capsule_join_feature(
+    features = create_capsule_join_feature(
         root,
         "Side Wall Panel",
         ribs,
         PARAMETERS["bottomThickness"] + PARAMETERS["sidePanelHeight"]
+    )
+
+    for index, panel in enumerate(layout.verticalSidePanels()):
+        sketch = root.sketches.add(
+            create_offset_yz_plane(root, panel["x"], "Side Wall Panel " + str(index + 1))
+        )
+        sketch.name = EXTRA_SKETCH_PREFIX + "Vertical Side Wall " + str(index + 1)
+        draw_vertical_polygon(sketch, panel["x"], panel["outer"])
+
+        for window in panel["windows"]:
+            draw_vertical_polygon(sketch, panel["x"], window)
+
+        direction = adsk.fusion.ExtentDirections.PositiveExtentDirection
+        if panel["side"] > 0:
+            direction = adsk.fusion.ExtentDirections.NegativeExtentDirection
+
+        features.append(
+            extrude_profile(
+                root,
+                multi_loop_profile(sketch),
+                panel["thickness"],
+                adsk.fusion.FeatureOperations.JoinFeatureOperation,
+                0.0,
+                direction
+            )
+        )
+
+    return features
+
+
+def create_ice_channel_shoulders(root, layout):
+    return create_capsule_join_feature(
+        root,
+        "Ice Channel Shoulders",
+        layout.iceChannelShoulderRibs(),
+        PARAMETERS["bottomThickness"] + 22.0
     )
 
 
@@ -297,6 +374,7 @@ def create_bottom_frame(design):
         create_can_holder(root, layout, index)
 
     create_structural_frame_ribs(root, layout)
+    create_ice_channel_shoulders(root, layout)
     create_ice_pack_guides(root, layout)
     create_side_wall_panels(root, layout)
     create_cooling_ribs(root, layout)
