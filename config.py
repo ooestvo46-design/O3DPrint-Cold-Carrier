@@ -20,6 +20,9 @@ PARAMETERS = {
     "frameOpeningWeb": 8.0,
     "structuralRib": 10.0,
     "outerFrameRib": 12.0,
+    "holderTaperAngle": 0.6,
+    "holderBlendRib": 9.0,
+    "iceRailWidth": 5.0,
 
     "fillet": 5.0,
     "textHeight": 6.0,
