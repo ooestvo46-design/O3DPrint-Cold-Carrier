@@ -7,11 +7,9 @@ from geometry import Layout
 
 
 SKETCH_NAME = "O3DPrint Carrier V2 Layout"
-BASE_SKETCH_NAME = "O3DPrint Carrier V2 Base"
 HOLDER_SKETCH_PREFIX = "O3DPrint Carrier V2 Holder "
 EXTRA_SKETCH_PREFIX = "O3DPrint Carrier V2 Extra "
-TEXT_SKETCH_PREFIX = "O3DPrint Carrier V2 Text "
-BODY_NAME = "O3DPrint Carrier V2 Bottom Frame"
+BODY_PREFIX = "O3DPrint Carrier V2 Body "
 GENERATED_BODY_PREFIX = "O3DPrint Carrier V2"
 
 
@@ -34,21 +32,14 @@ def remove_existing_layout_sketch(root):
 
 
 def remove_existing_bottom_frame(root):
-    sketch_names = [BASE_SKETCH_NAME]
-    sketch_prefixes = [EXTRA_SKETCH_PREFIX, TEXT_SKETCH_PREFIX]
-    sketch_names.extend(
-        HOLDER_SKETCH_PREFIX + str(index + 1)
-        for index in range(PARAMETERS["canCount"])
-    )
+    sketch_prefixes = [HOLDER_SKETCH_PREFIX, EXTRA_SKETCH_PREFIX]
 
     for body in collection_items(root.bRepBodies):
         if body.name.startswith(GENERATED_BODY_PREFIX):
             body.deleteMe()
 
     for sketch in collection_items(root.sketches):
-        if sketch.name in sketch_names:
-            sketch.deleteMe()
-        elif any(sketch.name.startswith(prefix) for prefix in sketch_prefixes):
+        if any(sketch.name.startswith(prefix) for prefix in sketch_prefixes):
             sketch.deleteMe()
 
 
@@ -71,16 +62,6 @@ def create_layout_sketch(design):
     return sketch
 
 
-def first_profile(sketch):
-    if sketch.profiles.count < 1:
-        raise RuntimeError("No sketch profile was created.")
-    return sketch.profiles.item(0)
-
-
-def largest_profile(sketch):
-    return first_profile(sketch)
-
-
 def ring_profile(sketch):
     for index in range(sketch.profiles.count):
         profile = sketch.profiles.item(index)
@@ -100,83 +81,50 @@ def extrude_profile(root, profile, height, operation):
     return extrudes.add(extrude_input)
 
 
-def draw_closed_polygon(sketch, points):
-    lines = sketch.sketchCurves.sketchLines
-    for index in range(len(points)):
-        x1, y1 = points[index]
-        x2, y2 = points[(index + 1) % len(points)]
-        lines.addByTwoPoints(mm_point(x1, y1), mm_point(x2, y2))
-
-
 def draw_rectangle(sketch, x, y, width, height):
     center = mm_point(x + width / 2.0, y + height / 2.0)
     corner = mm_point(x + width, y + height)
     sketch.sketchCurves.sketchLines.addCenterPointRectangle(center, corner)
 
 
-def quote_text_expression(text):
-    return "'" + text.replace("'", "\\'") + "'"
+def draw_capsule(sketch, x1, y1, x2, y2, width):
+    radius = width / 2.0
+    circles = sketch.sketchCurves.sketchCircles
+
+    if abs(x1 - x2) >= abs(y1 - y2):
+        left = min(x1, x2)
+        right = max(x1, x2)
+        y = (y1 + y2) / 2.0
+        draw_rectangle(sketch, left, y - radius, right - left, width)
+        circles.addByCenterRadius(mm_point(left, y), radius * MM_TO_CM)
+        circles.addByCenterRadius(mm_point(right, y), radius * MM_TO_CM)
+    else:
+        x = (x1 + x2) / 2.0
+        bottom = min(y1, y2)
+        top = max(y1, y2)
+        draw_rectangle(sketch, x - radius, bottom, width, top - bottom)
+        circles.addByCenterRadius(mm_point(x, bottom), radius * MM_TO_CM)
+        circles.addByCenterRadius(mm_point(x, top), radius * MM_TO_CM)
 
 
-def add_multiline_sketch_text(sketch, text, x, y, width, height):
-    sketch_texts = sketch.sketchTexts
-    text_height = mm_value(PARAMETERS["textHeight"])
-    corner = mm_point(x, y)
-    diagonal = mm_point(x + width, y + height)
-
-    create_input3 = getattr(sketch_texts, "createInput3", None)
-
-    if create_input3:
-        text_input = create_input3(quote_text_expression(text), text_height)
-        text_input.setAsMultiLine(
-            corner,
-            diagonal,
-            adsk.core.HorizontalAlignments.CenterHorizontalAlignment,
-            adsk.core.VerticalAlignments.MiddleVerticalAlignment,
-            0.0
-        )
-        return sketch_texts.add(text_input)
-
-    text_input = sketch_texts.createInput(
-        text,
-        PARAMETERS["textHeight"] * MM_TO_CM,
-        corner
-    )
-    return sketch_texts.add(text_input)
-
-
-def create_base(root, layout):
-    sketch = root.sketches.add(root.xYConstructionPlane)
-    sketch.name = BASE_SKETCH_NAME
-
-    draw_closed_polygon(sketch, layout.basePolygon())
-
-    feature = extrude_profile(
-        root,
-        largest_profile(sketch),
-        PARAMETERS["bottomThickness"],
-        adsk.fusion.FeatureOperations.NewBodyFeatureOperation
-    )
-
-    feature.bodies.item(0).name = BODY_NAME
-    return feature
-
-
-def create_can_holder(root, layout, index, center):
+def create_can_holder(root, layout, index):
     sketch = root.sketches.add(root.xYConstructionPlane)
     sketch.name = HOLDER_SKETCH_PREFIX + str(index + 1)
 
+    x, y = layout.canCenters()[index]
     circles = sketch.sketchCurves.sketchCircles
-    circle_center = mm_point(center[0], center[1])
-    circles.addByCenterRadius(circle_center, layout.holderOuterRadius * MM_TO_CM)
-    circles.addByCenterRadius(circle_center, layout.holderInnerRadius * MM_TO_CM)
+    center = mm_point(x, y)
+    circles.addByCenterRadius(center, layout.holderOuterRadius * MM_TO_CM)
+    circles.addByCenterRadius(center, layout.holderInnerRadius * MM_TO_CM)
 
-    return extrude_profile(
+    feature = extrude_profile(
         root,
         ring_profile(sketch),
         PARAMETERS["bottomThickness"] + PARAMETERS["guideRailHeight"],
-        adsk.fusion.FeatureOperations.JoinFeatureOperation
+        adsk.fusion.FeatureOperations.NewBodyFeatureOperation
     )
+    feature.bodies.item(0).name = BODY_PREFIX + "Can Holder " + str(index + 1)
+    return feature
 
 
 def create_rectangular_join_feature(root, name, rectangles, height):
@@ -187,9 +135,7 @@ def create_rectangular_join_feature(root, name, rectangles, height):
         draw_rectangle(sketch, *rect)
 
     features = []
-    profiles = collection_items(sketch.profiles)
-
-    for profile in profiles:
+    for profile in collection_items(sketch.profiles):
         features.append(
             extrude_profile(
                 root,
@@ -201,25 +147,24 @@ def create_rectangular_join_feature(root, name, rectangles, height):
     return features
 
 
-def create_rectangular_cut_feature(root, name, rectangles, height):
-    sketch = root.sketches.add(root.xYConstructionPlane)
-    sketch.name = EXTRA_SKETCH_PREFIX + name
-
-    for rect in rectangles:
-        draw_rectangle(sketch, *rect)
-
+def create_capsule_join_feature(root, name, ribs, height):
     features = []
-    profiles = collection_items(sketch.profiles)
 
-    for profile in profiles:
-        features.append(
-            extrude_profile(
-                root,
-                profile,
-                height,
-                adsk.fusion.FeatureOperations.CutFeatureOperation
+    for index, rib in enumerate(ribs):
+        sketch = root.sketches.add(root.xYConstructionPlane)
+        sketch.name = EXTRA_SKETCH_PREFIX + name + " " + str(index + 1)
+        draw_capsule(sketch, *rib)
+
+        for profile in collection_items(sketch.profiles):
+            features.append(
+                extrude_profile(
+                    root,
+                    profile,
+                    height,
+                    adsk.fusion.FeatureOperations.JoinFeatureOperation
+                )
             )
-        )
+
     return features
 
 
@@ -243,32 +188,17 @@ def create_cooling_ribs(root, layout):
     )
 
 
-def create_handle_guide_rails(root, layout):
-    return create_rectangular_join_feature(
+def create_structural_frame_ribs(root, layout):
+    ribs = []
+    ribs.extend(layout.structuralRibs())
+    ribs.extend(layout.perimeterRibs())
+    ribs.extend(layout.icePackBridgeRibs())
+
+    return create_capsule_join_feature(
         root,
-        "Handle Guide Rails",
-        layout.handleGuideRails(),
-        PARAMETERS["bottomThickness"] + PARAMETERS["guideRailHeight"]
-    )
-
-
-def create_cooling_windows(root, layout):
-    cut_height = PARAMETERS["bottomThickness"] + PARAMETERS["guideRailHeight"] + 5.0
-    return create_rectangular_cut_feature(
-        root,
-        "Cooling Windows",
-        layout.coolingWindows(),
-        cut_height
-    )
-
-
-def create_base_relief_openings(root, layout):
-    cut_height = PARAMETERS["bottomThickness"] + PARAMETERS["guideRailHeight"] + 5.0
-    return create_rectangular_cut_feature(
-        root,
-        "Base Relief Openings",
-        layout.baseReliefOpenings(),
-        cut_height
+        "Structural Rib",
+        ribs,
+        PARAMETERS["bottomThickness"] + PARAMETERS["guideRail"],
     )
 
 
@@ -289,52 +219,16 @@ def create_raised_can_pads(root, layout):
         )
 
 
-def create_drain_holes(root, layout):
-    sketch = root.sketches.add(root.xYConstructionPlane)
-    sketch.name = EXTRA_SKETCH_PREFIX + "Drain Holes"
-
-    circles = sketch.sketchCurves.sketchCircles
-    for x, y in layout.drainPoints():
-        circles.addByCenterRadius(mm_point(x, y), 2.5 * MM_TO_CM)
-
-    for profile in collection_items(sketch.profiles):
-        extrude_profile(
-            root,
-            profile,
-            PARAMETERS["bottomThickness"] + 2.0,
-            adsk.fusion.FeatureOperations.CutFeatureOperation
-        )
-
-
-def create_side_text_sketches(root, layout):
-    for block in layout.sideTextBlocks():
-        sketch = root.sketches.add(root.xYConstructionPlane)
-        sketch.name = TEXT_SKETCH_PREFIX + block["name"]
-        add_multiline_sketch_text(
-            sketch,
-            block["text"],
-            block["x"],
-            block["y"],
-            block["width"],
-            block["height"]
-        )
-
-
 def create_bottom_frame(design):
     root = design.rootComponent
     remove_existing_bottom_frame(root)
 
     layout = Layout()
-    create_base(root, layout)
 
-    for index, center in enumerate(layout.canCenters()):
-        create_can_holder(root, layout, index, center)
+    for index in range(len(layout.canCenters())):
+        create_can_holder(root, layout, index)
 
+    create_structural_frame_ribs(root, layout)
     create_ice_pack_guides(root, layout)
     create_cooling_ribs(root, layout)
-    create_handle_guide_rails(root, layout)
-    create_cooling_windows(root, layout)
-    create_base_relief_openings(root, layout)
     create_raised_can_pads(root, layout)
-    create_drain_holes(root, layout)
-    create_side_text_sketches(root, layout)
