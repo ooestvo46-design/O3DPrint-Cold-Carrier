@@ -30,6 +30,7 @@ class Layout:
         self.moldedWebRib = PARAMETERS["moldedWebRib"]
         self.sideBandRib = PARAMETERS["sideBandRib"]
         self.iceRailWidth = PARAMETERS["iceRailWidth"]
+        self.handleReceiverRib = PARAMETERS["handleReceiverRib"]
 
         self.holderInnerRadius = self.canRadius + 1.0
         self.holderOuterRadius = self.holderInnerRadius + self.wall
@@ -275,6 +276,39 @@ class Layout:
 
             ribs.append((outer_x, self.rows[0], column_x, self.rows[0] - self.holderOuterRadius * 0.8, self.sideBandRib))
             ribs.append((outer_x, self.rows[2], column_x, self.rows[2] + self.holderOuterRadius * 0.8, self.sideBandRib))
+
+        return ribs
+
+    def sidePanelRibs(self):
+        ribs = []
+        side_offset = self.holderOuterRadius + self.sideBandRib / 2.0 - 2.0
+        panel_inner = self.holderOuterRadius * 0.55
+
+        for column_x, side in ((self.leftX, -1), (self.rightX, 1)):
+            outer_x = column_x + side * side_offset
+            inner_x = column_x - side * panel_inner
+
+            for lower, upper in zip(self.rows, self.rows[1:]):
+                mid_y = (lower + upper) / 2.0
+                aperture = self.rowSpacing * 0.36
+                ribs.append((outer_x, lower + aperture, inner_x, mid_y, self.sideBandRib * 0.72))
+                ribs.append((inner_x, mid_y, outer_x, upper - aperture, self.sideBandRib * 0.72))
+                ribs.append((outer_x, lower + aperture, outer_x, upper - aperture, self.sideBandRib * 0.58))
+
+        return ribs
+
+    def handleReceiverRibs(self):
+        ribs = []
+        side_offset = self.holderOuterRadius + self.sideBandRib / 2.0 - 2.0
+        receiver_y = 0.0
+        receiver_span = self.rowSpacing * 0.54
+
+        for column_x, side in ((self.leftX, -1), (self.rightX, 1)):
+            outer_x = column_x + side * side_offset
+            inner_x = outer_x - side * (self.handleReceiverRib * 1.4)
+            ribs.append((outer_x, receiver_y - receiver_span / 2.0, outer_x, receiver_y + receiver_span / 2.0, self.handleReceiverRib))
+            ribs.append((outer_x, receiver_y - receiver_span / 2.0, inner_x, receiver_y - receiver_span / 2.0, self.handleReceiverRib))
+            ribs.append((outer_x, receiver_y + receiver_span / 2.0, inner_x, receiver_y + receiver_span / 2.0, self.handleReceiverRib))
 
         return ribs
 
