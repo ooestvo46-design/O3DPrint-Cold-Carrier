@@ -169,6 +169,28 @@ def create_rectangular_join_feature(root, name, rectangles, height):
     return features
 
 
+def create_rectangular_cut_feature(root, name, rectangles, height):
+    sketch = root.sketches.add(root.xYConstructionPlane)
+    sketch.name = EXTRA_SKETCH_PREFIX + name
+
+    for rect in rectangles:
+        draw_rectangle(sketch, *rect)
+
+    features = []
+    profiles = collection_items(sketch.profiles)
+
+    for profile in profiles:
+        features.append(
+            extrude_profile(
+                root,
+                profile,
+                height,
+                adsk.fusion.FeatureOperations.CutFeatureOperation
+            )
+        )
+    return features
+
+
 def create_ice_pack_guides(root, layout):
     rects = list(layout.iceGuideRails())
     rects.append(layout.centerStop())
@@ -195,6 +217,26 @@ def create_handle_guide_rails(root, layout):
         "Handle Guide Rails",
         layout.handleGuideRails(),
         PARAMETERS["bottomThickness"] + PARAMETERS["guideRailHeight"]
+    )
+
+
+def create_cooling_windows(root, layout):
+    cut_height = PARAMETERS["bottomThickness"] + PARAMETERS["guideRailHeight"] + 5.0
+    return create_rectangular_cut_feature(
+        root,
+        "Cooling Windows",
+        layout.coolingWindows(),
+        cut_height
+    )
+
+
+def create_base_relief_openings(root, layout):
+    cut_height = PARAMETERS["bottomThickness"] + PARAMETERS["guideRailHeight"] + 5.0
+    return create_rectangular_cut_feature(
+        root,
+        "Base Relief Openings",
+        layout.baseReliefOpenings(),
+        cut_height
     )
 
 
@@ -245,5 +287,7 @@ def create_bottom_frame(design):
     create_ice_pack_guides(root, layout)
     create_cooling_ribs(root, layout)
     create_handle_guide_rails(root, layout)
+    create_cooling_windows(root, layout)
+    create_base_relief_openings(root, layout)
     create_raised_can_pads(root, layout)
     create_drain_holes(root, layout)
