@@ -22,6 +22,8 @@ PARAMETERS = {
     "outerFrameRib": 12.0,
     "holderTaperAngle": 0.6,
     "holderBlendRib": 9.0,
+    "moldedWebRib": 11.0,
+    "sideBandRib": 14.0,
     "iceRailWidth": 5.0,
 
     "fillet": 5.0,
