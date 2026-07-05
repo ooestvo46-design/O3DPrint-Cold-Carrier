@@ -340,6 +340,20 @@ def create_raised_can_pads(root, layout):
         )
 
 
+def create_temporary_execution_marker(root):
+    sketch = root.sketches.add(root.xYConstructionPlane)
+    sketch.name = EXTRA_SKETCH_PREFIX + "TEMP Execution Marker"
+    draw_rectangle(sketch, -20.0, -20.0, 40.0, 40.0)
+
+    feature = extrude_profile(
+        root,
+        collection_items(sketch.profiles)[0],
+        30.0,
+        adsk.fusion.FeatureOperations.NewBodyFeatureOperation
+    )
+    feature.bodies.item(0).name = BODY_PREFIX + "TEMP EXECUTION MARKER - REMOVE"
+
+
 def soften_generated_edges(root):
     radius = PARAMETERS.get("softEdgeFillet", 0.0)
     if radius <= 0:
@@ -379,4 +393,5 @@ def create_bottom_frame(design):
     create_side_wall_panels(root, layout)
     create_cooling_ribs(root, layout)
     create_raised_can_pads(root, layout)
+    create_temporary_execution_marker(root)
     soften_generated_edges(root)
