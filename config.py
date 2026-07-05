@@ -26,6 +26,8 @@ PARAMETERS = {
     "sideBandRib": 14.0,
     "iceRailWidth": 5.0,
     "softEdgeFillet": 1.2,
+    "sidePanelHeight": 32.0,
+    "handleReceiverRib": 12.0,
 
     "fillet": 5.0,
     "textHeight": 6.0,
