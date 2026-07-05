@@ -20,7 +20,7 @@ PARAMETERS = {
     "frameOpeningWeb": 8.0,
 
     "fillet": 5.0,
-    "textHeight": 0.8,
+    "textHeight": 6.0,
     "textDepth": 0.8,
 
     "canCount": 6
