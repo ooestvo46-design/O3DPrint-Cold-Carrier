@@ -26,6 +26,8 @@ class Layout:
         self.frameOpeningWeb = PARAMETERS["frameOpeningWeb"]
         self.structuralRib = PARAMETERS["structuralRib"]
         self.outerFrameRib = PARAMETERS["outerFrameRib"]
+        self.holderBlendRib = PARAMETERS["holderBlendRib"]
+        self.iceRailWidth = PARAMETERS["iceRailWidth"]
 
         self.holderInnerRadius = self.canRadius + 1.0
         self.holderOuterRadius = self.holderInnerRadius + self.wall
@@ -82,16 +84,39 @@ class Layout:
         rail_length = self.iceHeight - 8.0
         y = -rail_length / 2.0
         return [
-            (-self.iceThickness / 2.0 - self.guideRail, y, self.guideRail, rail_length),
-            (self.iceThickness / 2.0, y, self.guideRail, rail_length),
+            (-self.iceThickness / 2.0 - self.iceRailWidth, y, self.iceRailWidth, rail_length),
+            (self.iceThickness / 2.0, y, self.iceRailWidth, rail_length),
+        ]
+
+    def iceGuideRibs(self):
+        rail_length = self.iceHeight - 8.0
+        lower_y = -rail_length / 2.0
+        upper_y = rail_length / 2.0
+        return [
+            (-self.iceThickness / 2.0 - self.iceRailWidth / 2.0, lower_y,
+             -self.iceThickness / 2.0 - self.iceRailWidth / 2.0, upper_y,
+             self.iceRailWidth),
+            (self.iceThickness / 2.0 + self.iceRailWidth / 2.0, lower_y,
+             self.iceThickness / 2.0 + self.iceRailWidth / 2.0, upper_y,
+             self.iceRailWidth),
         ]
 
     def centerStop(self):
         return (
-            -self.iceThickness / 2.0 - self.guideRail,
+            -self.iceThickness / 2.0 - self.iceRailWidth,
             -self.iceHeight / 2.0 - 4.0,
-            self.iceThickness + 2.0 * self.guideRail,
+            self.iceThickness + 2.0 * self.iceRailWidth,
             5.0,
+        )
+
+    def centerStopRib(self):
+        y = -self.iceHeight / 2.0 - 1.5
+        return (
+            -self.iceThickness / 2.0 - self.iceRailWidth / 2.0,
+            y,
+            self.iceThickness / 2.0 + self.iceRailWidth / 2.0,
+            y,
+            self.iceRailWidth,
         )
 
     def handleGuideRails(self):
@@ -140,6 +165,37 @@ class Layout:
 
         return ribs
 
+    def holderBlendRibs(self):
+        ribs = []
+        overlap = 3.0
+        blend_length = self.holderOuterRadius * 0.45
+        radial_start = self.holderOuterRadius - overlap
+        radial_end = self.holderOuterRadius + blend_length
+
+        for cx, cy in self.canCenters():
+            side = -1 if cx < 0 else 1
+            directions = [
+                (side, 0.0),
+                (0.0, -1.0),
+                (0.0, 1.0),
+                (-side * 0.65, -0.76),
+                (-side * 0.65, 0.76),
+            ]
+
+            for dx, dy in directions:
+                length = (dx * dx + dy * dy) ** 0.5
+                unit_x = dx / length
+                unit_y = dy / length
+                ribs.append((
+                    cx + unit_x * radial_start,
+                    cy + unit_y * radial_start,
+                    cx + unit_x * radial_end,
+                    cy + unit_y * radial_end,
+                    self.holderBlendRib,
+                ))
+
+        return ribs
+
     def perimeterRibs(self):
         ribs = []
         edge_overlap = 2.0
@@ -167,14 +223,14 @@ class Layout:
 
         for y in y_positions:
             ribs.append((
-                -self.iceThickness / 2.0 - self.guideRail,
+                -self.iceThickness / 2.0 - self.iceRailWidth,
                 y,
                 self.leftX + self.holderInnerRadius,
                 y,
                 rib_width,
             ))
             ribs.append((
-                self.iceThickness / 2.0 + self.guideRail,
+                self.iceThickness / 2.0 + self.iceRailWidth,
                 y,
                 self.rightX - self.holderInnerRadius,
                 y,
