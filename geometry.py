@@ -24,6 +24,8 @@ class Layout:
         self.guideRail = PARAMETERS["guideRail"]
         self.guideRailHeight = PARAMETERS.get("guideRailHeight", 55.0)
         self.frameOpeningWeb = PARAMETERS["frameOpeningWeb"]
+        self.structuralRib = PARAMETERS["structuralRib"]
+        self.outerFrameRib = PARAMETERS["outerFrameRib"]
 
         self.holderInnerRadius = self.canRadius + 1.0
         self.holderOuterRadius = self.holderInnerRadius + self.wall
@@ -122,6 +124,67 @@ class Layout:
 
         return ribs
 
+    def structuralRibs(self):
+        ribs = []
+        centers = self.canCenters()
+        left_centers = [point for point in centers if point[0] < 0]
+        right_centers = [point for point in centers if point[0] > 0]
+        tangent_offset = self.holderInnerRadius + self.structuralRib / 2.0
+
+        for column in (left_centers, right_centers):
+            column = sorted(column, key=lambda point: point[1])
+            for start, end in zip(column, column[1:]):
+                for side in (-1, 1):
+                    x = start[0] + side * tangent_offset
+                    ribs.append((x, start[1], x, end[1], self.structuralRib))
+
+        lower_y = self.rows[0]
+        upper_y = self.rows[2]
+        ribs.append((self.leftX + tangent_offset, lower_y, self.rightX - tangent_offset, lower_y, self.structuralRib))
+        ribs.append((self.leftX + tangent_offset, upper_y, self.rightX - tangent_offset, upper_y, self.structuralRib))
+
+        return ribs
+
+    def perimeterRibs(self):
+        x, y, width, height = self.base()
+        left_x = x + self.outerFrameRib / 2.0
+        right_x = x + width - self.outerFrameRib / 2.0
+        bottom_y = y + self.outerFrameRib / 2.0
+        top_y = y + height - self.outerFrameRib / 2.0
+
+        return [
+            (left_x, bottom_y, left_x, top_y, self.outerFrameRib),
+            (right_x, bottom_y, right_x, top_y, self.outerFrameRib),
+            (left_x, bottom_y, right_x, bottom_y, self.outerFrameRib),
+            (left_x, top_y, right_x, top_y, self.outerFrameRib),
+        ]
+
+    def icePackBridgeRibs(self):
+        ribs = []
+        rib_width = self.structuralRib * 0.65
+        y_positions = [
+            (self.rows[0] + self.rows[1]) / 2.0,
+            (self.rows[1] + self.rows[2]) / 2.0,
+        ]
+
+        for y in y_positions:
+            ribs.append((
+                -self.iceThickness / 2.0 - self.guideRail,
+                y,
+                self.leftX + self.holderInnerRadius,
+                y,
+                rib_width,
+            ))
+            ribs.append((
+                self.iceThickness / 2.0 + self.guideRail,
+                y,
+                self.rightX - self.holderInnerRadius,
+                y,
+                rib_width,
+            ))
+
+        return ribs
+
     def coolingWindows(self):
         windows = []
         window_height = min(46.0, self.rowSpacing - self.frameOpeningWeb)
@@ -189,46 +252,3 @@ class Layout:
                 slots.append((x - slot_width / 2.0, y - slot_height / 2.0, slot_width, slot_height))
 
         return slots
-
-    def sideTextBlocks(self):
-        x, y, width, height = self.base()
-        long_width = min(96.0, width - 2.0 * self.frameOpeningWeb)
-        long_height = 22.0
-        short_width = min(72.0, height - 2.0 * self.frameOpeningWeb)
-        short_height = 16.0
-        offset = 3.0
-
-        return [
-            {
-                "name": "Long Side Front",
-                "text": "O3DPRINT\n❄\nCOLD CARRIER",
-                "x": -long_width / 2.0,
-                "y": y + offset,
-                "width": long_width,
-                "height": long_height,
-            },
-            {
-                "name": "Long Side Back",
-                "text": "O3DPRINT\n❄\nCOLD CARRIER",
-                "x": -long_width / 2.0,
-                "y": y + height - offset - long_height,
-                "width": long_width,
-                "height": long_height,
-            },
-            {
-                "name": "Short Side Left",
-                "text": "DESIGNED BY\nO3DPRINT",
-                "x": x + offset,
-                "y": -short_height / 2.0,
-                "width": short_width,
-                "height": short_height,
-            },
-            {
-                "name": "Short Side Right",
-                "text": "DESIGNED BY\nO3DPRINT",
-                "x": x + width - offset - short_width,
-                "y": -short_height / 2.0,
-                "width": short_width,
-                "height": short_height,
-            },
-        ]
