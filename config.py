@@ -16,6 +16,8 @@ PARAMETERS = {
     "guideRail": 2.0,
     "guideRailHeight": 55.0,
     "airGap": 4.0,
+    "coolingGap": 12.0,
+    "frameOpeningWeb": 8.0,
 
     "fillet": 5.0,
     "textHeight": 0.8,
