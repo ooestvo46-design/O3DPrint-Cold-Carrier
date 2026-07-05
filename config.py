@@ -27,7 +27,10 @@ PARAMETERS = {
     "iceRailWidth": 5.0,
     "softEdgeFillet": 1.2,
     "sidePanelHeight": 32.0,
+    "sidePanelThickness": 5.0,
     "handleReceiverRib": 12.0,
+    "holderButtressRib": 12.0,
+    "iceShoulderRib": 9.0,
 
     "fillet": 5.0,
     "textHeight": 6.0,
