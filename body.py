@@ -21,6 +21,10 @@ def mm_value(value):
     return adsk.core.ValueInput.createByReal(value * MM_TO_CM)
 
 
+def angle_value(degrees):
+    return adsk.core.ValueInput.createByString(str(degrees) + " deg")
+
+
 def collection_items(collection):
     return [collection.item(index) for index in range(collection.count)]
 
@@ -70,14 +74,29 @@ def ring_profile(sketch):
     raise RuntimeError("No ring profile was created.")
 
 
-def extrude_profile(root, profile, height, operation):
+def extrude_profile(root, profile, height, operation, taper_angle=0.0):
     extrudes = root.features.extrudeFeatures
     extrude_input = extrudes.createInput(profile, operation)
     extent = adsk.fusion.DistanceExtentDefinition.create(mm_value(height))
-    extrude_input.setOneSideExtent(
-        extent,
-        adsk.fusion.ExtentDirections.PositiveExtentDirection
-    )
+
+    if taper_angle:
+        try:
+            extrude_input.setOneSideExtent(
+                extent,
+                adsk.fusion.ExtentDirections.PositiveExtentDirection,
+                angle_value(taper_angle)
+            )
+        except TypeError:
+            extrude_input.setOneSideExtent(
+                extent,
+                adsk.fusion.ExtentDirections.PositiveExtentDirection
+            )
+    else:
+        extrude_input.setOneSideExtent(
+            extent,
+            adsk.fusion.ExtentDirections.PositiveExtentDirection
+        )
+
     return extrudes.add(extrude_input)
 
 
@@ -121,7 +140,8 @@ def create_can_holder(root, layout, index):
         root,
         ring_profile(sketch),
         PARAMETERS["bottomThickness"] + PARAMETERS["guideRailHeight"],
-        adsk.fusion.FeatureOperations.NewBodyFeatureOperation
+        adsk.fusion.FeatureOperations.NewBodyFeatureOperation,
+        PARAMETERS["holderTaperAngle"]
     )
     feature.bodies.item(0).name = BODY_PREFIX + "Can Holder " + str(index + 1)
     return feature
@@ -169,12 +189,13 @@ def create_capsule_join_feature(root, name, ribs, height):
 
 
 def create_ice_pack_guides(root, layout):
-    rects = list(layout.iceGuideRails())
-    rects.append(layout.centerStop())
-    return create_rectangular_join_feature(
+    ribs = list(layout.iceGuideRibs())
+    ribs.append(layout.centerStopRib())
+
+    return create_capsule_join_feature(
         root,
         "Ice Pack Guides",
-        rects,
+        ribs,
         PARAMETERS["bottomThickness"] + PARAMETERS["guideRailHeight"]
     )
 
@@ -191,6 +212,7 @@ def create_cooling_ribs(root, layout):
 def create_structural_frame_ribs(root, layout):
     ribs = []
     ribs.extend(layout.structuralRibs())
+    ribs.extend(layout.holderBlendRibs())
     ribs.extend(layout.perimeterRibs())
     ribs.extend(layout.icePackBridgeRibs())
 
