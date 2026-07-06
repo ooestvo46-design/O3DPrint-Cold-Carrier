@@ -9,7 +9,6 @@ from geometry import Layout
 SKETCH_NAME = "O3DPrint Carrier V2 Layout"
 HOLDER_SKETCH_PREFIX = "O3DPrint Carrier V2 Holder "
 EXTRA_SKETCH_PREFIX = "O3DPrint Carrier V2 Extra "
-PLANE_PREFIX = "O3DPrint Carrier V2 Plane "
 BODY_PREFIX = "O3DPrint Carrier V2 Body "
 GENERATED_BODY_PREFIX = "O3DPrint Carrier V2"
 
@@ -54,10 +53,6 @@ def remove_existing_bottom_frame(root):
         if any(sketch.name.startswith(prefix) for prefix in sketch_prefixes):
             sketch.deleteMe()
 
-    for plane in collection_items(root.constructionPlanes):
-        if plane.name.startswith(PLANE_PREFIX):
-            plane.deleteMe()
-
 
 def create_layout_sketch(design):
     root = design.rootComponent
@@ -84,22 +79,6 @@ def ring_profile(sketch):
         if profile.profileLoops.count == 2:
             return profile
     raise RuntimeError("No ring profile was created.")
-
-
-def multi_loop_profile(sketch):
-    best_profile = None
-    best_loop_count = 0
-
-    for profile in collection_items(sketch.profiles):
-        loop_count = profile.profileLoops.count
-        if loop_count > best_loop_count:
-            best_profile = profile
-            best_loop_count = loop_count
-
-    if best_profile:
-        return best_profile
-
-    raise RuntimeError("No closed profile was created.")
 
 
 def extrude_profile(root, profile, height, operation, taper_angle=0.0, direction=None):
@@ -155,24 +134,6 @@ def draw_capsule(sketch, x1, y1, x2, y2, width):
         circles.addByCenterRadius(mm_point(x, top), radius * MM_TO_CM)
 
 
-def draw_vertical_polygon(sketch, x, points):
-    sketch_lines = sketch.sketchCurves.sketchLines
-    sketch_points = [mm_point(x, y, z) for y, z in points]
-
-    for index, start in enumerate(sketch_points):
-        end = sketch_points[(index + 1) % len(sketch_points)]
-        sketch_lines.addByTwoPoints(start, end)
-
-
-def create_offset_yz_plane(root, x, name):
-    planes = root.constructionPlanes
-    plane_input = planes.createInput()
-    plane_input.setByOffset(root.yZConstructionPlane, mm_value(x))
-    plane = planes.add(plane_input)
-    plane.name = PLANE_PREFIX + name
-    return plane
-
-
 def create_can_holder(root, layout, index):
     sketch = root.sketches.add(root.xYConstructionPlane)
     sketch.name = HOLDER_SKETCH_PREFIX + str(index + 1)
@@ -192,6 +153,34 @@ def create_can_holder(root, layout, index):
     )
     feature.bodies.item(0).name = BODY_PREFIX + "Can Holder " + str(index + 1)
     return feature
+
+
+def create_holder_shoulders(root, layout):
+    sketch = root.sketches.add(root.xYConstructionPlane)
+    sketch.name = EXTRA_SKETCH_PREFIX + "Integrated Holder Shoulders"
+
+    circles = sketch.sketchCurves.sketchCircles
+    shoulder_radius = layout.holderOuterRadius + PARAMETERS["holderBlendRib"]
+
+    for x, y in layout.canCenters():
+        center = mm_point(x, y)
+        circles.addByCenterRadius(center, shoulder_radius * MM_TO_CM)
+        circles.addByCenterRadius(center, layout.holderInnerRadius * MM_TO_CM)
+
+    features = []
+    for profile in collection_items(sketch.profiles):
+        if profile.profileLoops.count == 2:
+            features.append(
+                extrude_profile(
+                    root,
+                    profile,
+                    PARAMETERS["bottomThickness"] + 16.0,
+                    adsk.fusion.FeatureOperations.JoinFeatureOperation,
+                    PARAMETERS["holderTaperAngle"]
+                )
+            )
+
+    return features
 
 
 def create_rectangular_join_feature(root, name, rectangles, height):
@@ -257,45 +246,62 @@ def create_cooling_ribs(root, layout):
     )
 
 
+def side_truss_ribs(layout):
+    ribs = []
+    side_width = max(PARAMETERS["wall"], PARAMETERS["sideBandRib"] * 0.72)
+    diagonal_width = max(PARAMETERS["wall"], PARAMETERS["sideBandRib"] * 0.62)
+
+    for column_x, side in ((layout.leftX, -1), (layout.rightX, 1)):
+        outer_x = column_x + side * (layout.holderOuterRadius + side_width * 0.42)
+        inner_x = column_x + side * (layout.holderOuterRadius * 0.28)
+        end_y = layout.holderOuterRadius * 0.72
+
+        ribs.append((
+            outer_x,
+            layout.rows[0] - end_y,
+            outer_x,
+            layout.rows[2] + end_y,
+            side_width,
+        ))
+
+        for lower, upper in zip(layout.rows, layout.rows[1:]):
+            middle_y = (lower + upper) / 2.0
+            opening = layout.rowSpacing * 0.30
+            ribs.append((outer_x, lower + opening, inner_x, middle_y, diagonal_width))
+            ribs.append((inner_x, middle_y, outer_x, upper - opening, diagonal_width))
+
+        for y in layout.rows:
+            ribs.append((
+                outer_x,
+                y - layout.holderOuterRadius * 0.34,
+                column_x + side * (layout.holderOuterRadius + PARAMETERS["holderBlendRib"] * 0.25),
+                y,
+                diagonal_width,
+            ))
+            ribs.append((
+                outer_x,
+                y + layout.holderOuterRadius * 0.34,
+                column_x + side * (layout.holderOuterRadius + PARAMETERS["holderBlendRib"] * 0.25),
+                y,
+                diagonal_width,
+            ))
+
+    return ribs
+
+
 def create_side_wall_panels(root, layout):
     ribs = []
     ribs.extend(layout.sidePanelRibs())
     ribs.extend(layout.handleReceiverRibs())
     ribs.extend(layout.holderButtressRibs())
+    ribs.extend(side_truss_ribs(layout))
 
-    features = create_capsule_join_feature(
+    return create_capsule_join_feature(
         root,
-        "Side Wall Panel",
+        "Integrated Side Truss",
         ribs,
         PARAMETERS["bottomThickness"] + PARAMETERS["sidePanelHeight"]
     )
-
-    for index, panel in enumerate(layout.verticalSidePanels()):
-        sketch = root.sketches.add(
-            create_offset_yz_plane(root, panel["x"], "Side Wall Panel " + str(index + 1))
-        )
-        sketch.name = EXTRA_SKETCH_PREFIX + "Vertical Side Wall " + str(index + 1)
-        draw_vertical_polygon(sketch, panel["x"], panel["outer"])
-
-        for window in panel["windows"]:
-            draw_vertical_polygon(sketch, panel["x"], window)
-
-        direction = adsk.fusion.ExtentDirections.PositiveExtentDirection
-        if panel["side"] > 0:
-            direction = adsk.fusion.ExtentDirections.NegativeExtentDirection
-
-        features.append(
-            extrude_profile(
-                root,
-                multi_loop_profile(sketch),
-                panel["thickness"],
-                adsk.fusion.FeatureOperations.JoinFeatureOperation,
-                0.0,
-                direction
-            )
-        )
-
-    return features
 
 
 def create_ice_channel_shoulders(root, layout):
@@ -340,20 +346,6 @@ def create_raised_can_pads(root, layout):
         )
 
 
-def create_temporary_execution_marker(root):
-    sketch = root.sketches.add(root.xYConstructionPlane)
-    sketch.name = EXTRA_SKETCH_PREFIX + "TEMP Execution Marker"
-    draw_rectangle(sketch, -20.0, -20.0, 40.0, 40.0)
-
-    feature = extrude_profile(
-        root,
-        collection_items(sketch.profiles)[0],
-        30.0,
-        adsk.fusion.FeatureOperations.NewBodyFeatureOperation
-    )
-    feature.bodies.item(0).name = BODY_PREFIX + "TEMP EXECUTION MARKER - REMOVE"
-
-
 def soften_generated_edges(root):
     radius = PARAMETERS.get("softEdgeFillet", 0.0)
     if radius <= 0:
@@ -387,11 +379,11 @@ def create_bottom_frame(design):
     for index in range(len(layout.canCenters())):
         create_can_holder(root, layout, index)
 
+    create_holder_shoulders(root, layout)
     create_structural_frame_ribs(root, layout)
     create_ice_channel_shoulders(root, layout)
     create_ice_pack_guides(root, layout)
     create_side_wall_panels(root, layout)
     create_cooling_ribs(root, layout)
     create_raised_can_pads(root, layout)
-    create_temporary_execution_marker(root)
     soften_generated_edges(root)
