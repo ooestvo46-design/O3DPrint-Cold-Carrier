@@ -317,22 +317,16 @@ def create_cooling_supports(root, layout):
         )
 
 
-def cut_drain_holes(root, layout):
+def create_drain_markers(root, layout):
     sketch = root.sketches.add(root.xYConstructionPlane)
-    sketch.name = EXTRA_SKETCH_PREFIX + "Drain Holes"
+    sketch.name = EXTRA_SKETCH_PREFIX + "Drain Hole Markers"
 
     circles = sketch.sketchCurves.sketchCircles
     drain_radius = 1.5
     for x, y in layout.drainPoints():
         circles.addByCenterRadius(mm_point(x, y), drain_radius * MM_TO_CM)
 
-    for profile in collection_items(sketch.profiles):
-        extrude_profile(
-            root,
-            profile,
-            PARAMETERS["bottomThickness"] + 2.0,
-            adsk.fusion.FeatureOperations.CutFeatureOperation
-        )
+    return sketch
 
 
 def soften_generated_edges(root):
@@ -368,7 +362,7 @@ def create_bottom_frame(design):
     layout = Layout()
 
     create_primary_body(root, layout)
-    cut_drain_holes(root, layout)
+    create_drain_markers(root, layout)
     cut_can_pockets(root, layout)
     cut_center_ice_channel(root, layout)
     cut_cooling_openings(root, layout)
