@@ -172,25 +172,24 @@ def create_primary_body(root, layout):
     return feature
 
 
-def cut_can_pockets(root, layout):
+def create_can_pocket_markers(root, layout):
+    # Temporarily disabled as cuts: can pocket profiles did not reliably
+    # intersect Fusion's target body. Keep visible sketches until the
+    # primary body shape is proven stable in Fusion.
     for index, (x, y) in enumerate(layout.canCenters()):
         sketch = root.sketches.add(root.xYConstructionPlane)
-        sketch.name = EXTRA_SKETCH_PREFIX + "Can Pocket Cut " + str(index + 1)
+        sketch.name = EXTRA_SKETCH_PREFIX + "Can Pocket Marker " + str(index + 1)
         sketch.sketchCurves.sketchCircles.addByCenterRadius(
             mm_point(x, y),
             layout.holderInnerRadius * MM_TO_CM
         )
-        extrude_profile(
-            root,
-            first_profile(sketch),
-            body_height() + 2.0,
-            adsk.fusion.FeatureOperations.CutFeatureOperation
-        )
 
 
-def cut_center_ice_channel(root, layout):
+def create_center_ice_channel_marker(root, layout):
+    # Temporarily disabled as a cut for the same target-body stability reason.
+    # This sketch marks the exact ice pack channel until safe cuts are restored.
     sketch = root.sketches.add(root.xYConstructionPlane)
-    sketch.name = EXTRA_SKETCH_PREFIX + "Ice Pack Channel Cut"
+    sketch.name = EXTRA_SKETCH_PREFIX + "Ice Pack Channel Marker"
 
     x, y, width, height = layout.icePack()
     clearance = PARAMETERS["airGap"]
@@ -202,17 +201,12 @@ def cut_center_ice_channel(root, layout):
         height
     )
 
-    extrude_profile(
-        root,
-        first_profile(sketch),
-        body_height() + 2.0,
-        adsk.fusion.FeatureOperations.CutFeatureOperation
-    )
 
-
-def cut_cooling_openings(root, layout):
+def create_cooling_opening_markers(root, layout):
+    # Temporarily disabled as cuts. These profiles remain visible markers so
+    # opening placement can be checked without risking Fusion cut failures.
     sketch = root.sketches.add(root.xYConstructionPlane)
-    sketch.name = EXTRA_SKETCH_PREFIX + "Molded Cooling Openings"
+    sketch.name = EXTRA_SKETCH_PREFIX + "Molded Cooling Opening Markers"
 
     for x, y, width, height in layout.coolingWindows():
         draw_rectangle(sketch, x, y, width, height)
@@ -220,18 +214,12 @@ def cut_cooling_openings(root, layout):
     for x, y, width, height in layout.baseReliefOpenings()[1:]:
         draw_rectangle(sketch, x, y, width, height)
 
-    for profile in collection_items(sketch.profiles):
-        extrude_profile(
-            root,
-            profile,
-            body_height() + 2.0,
-            adsk.fusion.FeatureOperations.CutFeatureOperation
-        )
 
-
-def cut_side_wall_windows(root, layout):
+def create_side_wall_window_markers(root, layout):
+    # Temporarily disabled as cuts. These side window sketches show the
+    # intended opening locations while preserving a runnable Fusion model.
     sketch = root.sketches.add(root.xYConstructionPlane)
-    sketch.name = EXTRA_SKETCH_PREFIX + "Side Wall Window Cuts"
+    sketch.name = EXTRA_SKETCH_PREFIX + "Side Wall Window Markers"
 
     for column_x, side in ((layout.leftX, -1), (layout.rightX, 1)):
         outside_x = column_x + side * (layout.holderOuterRadius + PARAMETERS["sideBandRib"] * 0.42)
@@ -249,14 +237,6 @@ def cut_side_wall_windows(root, layout):
                 width,
                 window_height
             )
-
-    for profile in collection_items(sketch.profiles):
-        extrude_profile(
-            root,
-            profile,
-            body_height() + 2.0,
-            adsk.fusion.FeatureOperations.CutFeatureOperation
-        )
 
 
 def create_ice_pack_guides(root, layout):
@@ -318,6 +298,8 @@ def create_cooling_supports(root, layout):
 
 
 def create_drain_markers(root, layout):
+    # Temporarily disabled as cuts. Drain positions are visible sketch markers
+    # until real cuts are reintroduced with target-body checks.
     sketch = root.sketches.add(root.xYConstructionPlane)
     sketch.name = EXTRA_SKETCH_PREFIX + "Drain Hole Markers"
 
@@ -363,10 +345,10 @@ def create_bottom_frame(design):
 
     create_primary_body(root, layout)
     create_drain_markers(root, layout)
-    cut_can_pockets(root, layout)
-    cut_center_ice_channel(root, layout)
-    cut_cooling_openings(root, layout)
-    cut_side_wall_windows(root, layout)
+    create_can_pocket_markers(root, layout)
+    create_center_ice_channel_marker(root, layout)
+    create_cooling_opening_markers(root, layout)
+    create_side_wall_window_markers(root, layout)
     create_ice_pack_guides(root, layout)
     create_cooling_supports(root, layout)
     create_handle_receivers(root, layout)
