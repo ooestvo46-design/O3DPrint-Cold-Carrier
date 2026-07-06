@@ -72,6 +72,10 @@ def body_height():
     return PARAMETERS["bottomThickness"] + PARAMETERS["sidePanelHeight"]
 
 
+def raised_feature_height():
+    return body_height() + 12.0
+
+
 def low_feature_height():
     return PARAMETERS["bottomThickness"] + PARAMETERS["guideRail"]
 
@@ -172,6 +176,87 @@ def create_primary_body(root, layout):
     return feature
 
 
+def create_integrated_holder_shoulders(root, layout):
+    # Native, parametric holder shoulders inspired by the STL reference's
+    # molded cradle logic. These are not mesh-derived and do not perform cuts.
+    sketch = root.sketches.add(root.xYConstructionPlane)
+    sketch.name = EXTRA_SKETCH_PREFIX + "Integrated Holder Shoulders"
+
+    outer = layout.holderInnerRadius + PARAMETERS["wall"] + PARAMETERS["holderBlendRib"] * 0.25
+    rib = PARAMETERS["moldedWebRib"]
+
+    for x, y in layout.canCenters():
+        draw_rectangle(
+            sketch,
+            x - outer * 0.56,
+            y + outer * 0.62,
+            outer * 1.12,
+            rib
+        )
+        draw_rectangle(
+            sketch,
+            x - outer * 0.56,
+            y - outer * 0.62 - rib,
+            outer * 1.12,
+            rib
+        )
+
+        side = -1 if x < 0 else 1
+        draw_rectangle(
+            sketch,
+            x + side * outer * 0.68 - rib / 2.0,
+            y - outer * 0.42,
+            rib,
+            outer * 0.84
+        )
+
+    for profile in collection_items(sketch.profiles):
+        extrude_profile(
+            root,
+            profile,
+            raised_feature_height(),
+            adsk.fusion.FeatureOperations.JoinFeatureOperation
+        )
+
+
+def create_reference_side_wall_structure(root, layout):
+    # The reference body uses high side walls with large windows. The cut-outs
+    # remain marker sketches for now, while these raised rails make the side
+    # wall logic visible without reintroducing unsafe Fusion cuts.
+    sketch = root.sketches.add(root.xYConstructionPlane)
+    sketch.name = EXTRA_SKETCH_PREFIX + "Reference Side Wall Structure"
+
+    rail = PARAMETERS["sidePanelThickness"] + PARAMETERS["wall"]
+    height = (layout.rows[-1] - layout.rows[0]) + layout.holderOuterRadius * 1.55
+
+    for column_x, side in ((layout.leftX, -1), (layout.rightX, 1)):
+        outside_x = column_x + side * (layout.holderOuterRadius + PARAMETERS["sideBandRib"] * 0.18)
+        draw_rectangle(
+            sketch,
+            outside_x - rail / 2.0,
+            layout.rows[0] - height / 2.0 + (layout.rows[-1] - layout.rows[0]) / 2.0,
+            rail,
+            height
+        )
+
+        for y in layout.rows:
+            draw_rectangle(
+                sketch,
+                column_x + side * layout.holderOuterRadius * 0.42 - rail / 2.0,
+                y - rail / 2.0,
+                rail,
+                rail
+            )
+
+    for profile in collection_items(sketch.profiles):
+        extrude_profile(
+            root,
+            profile,
+            raised_feature_height(),
+            adsk.fusion.FeatureOperations.JoinFeatureOperation
+        )
+
+
 def create_can_pocket_markers(root, layout):
     # Temporarily disabled as cuts: can pocket profiles did not reliably
     # intersect Fusion's target body. Keep visible sketches until the
@@ -250,7 +335,7 @@ def create_ice_pack_guides(root, layout):
         extrude_profile(
             root,
             profile,
-            body_height(),
+            raised_feature_height(),
             adsk.fusion.FeatureOperations.JoinFeatureOperation
         )
 
@@ -276,7 +361,7 @@ def create_handle_receivers(root, layout):
         extrude_profile(
             root,
             profile,
-            body_height(),
+            raised_feature_height(),
             adsk.fusion.FeatureOperations.JoinFeatureOperation
         )
 
@@ -349,6 +434,8 @@ def create_bottom_frame(design):
     create_center_ice_channel_marker(root, layout)
     create_cooling_opening_markers(root, layout)
     create_side_wall_window_markers(root, layout)
+    create_integrated_holder_shoulders(root, layout)
+    create_reference_side_wall_structure(root, layout)
     create_ice_pack_guides(root, layout)
     create_cooling_supports(root, layout)
     create_handle_receivers(root, layout)
