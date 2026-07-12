@@ -340,6 +340,39 @@ def create_raised_can_pads(root, layout):
         )
 
 
+def combine_generated_bodies(root):
+    bodies = generated_bodies(root)
+
+    if len(bodies) <= 1:
+        return
+
+    target = bodies[0]
+    tools = adsk.core.ObjectCollection.create()
+    for body in bodies[1:]:
+        tools.add(body)
+
+    combine_features = root.features.combineFeatures
+    combine_input = combine_features.createInput(target, tools)
+    combine_input.operation = adsk.fusion.FeatureOperations.JoinFeatureOperation
+    combine_input.isKeepToolBodies = False
+
+    try:
+        combine_features.add(combine_input)
+    except RuntimeError as error:
+        raise RuntimeError(
+            "Generated carrier bodies could not be joined into one body. "
+            "Check that side panels and ribs overlap the can holders."
+        ) from error
+
+
+def verify_single_generated_body(root):
+    body_count = len(generated_bodies(root))
+    if body_count != 1:
+        raise RuntimeError(
+            "Expected one generated carrier body, found " + str(body_count) + "."
+        )
+
+
 def soften_generated_edges(root):
     radius = PARAMETERS.get("softEdgeFillet", 0.0)
     if radius <= 0:
@@ -379,4 +412,6 @@ def create_bottom_frame(design):
     create_side_wall_panels(root, layout)
     create_cooling_ribs(root, layout)
     create_raised_can_pads(root, layout)
+    combine_generated_bodies(root)
+    verify_single_generated_body(root)
     soften_generated_edges(root)
